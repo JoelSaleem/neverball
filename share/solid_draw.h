@@ -28,6 +28,9 @@
 
 /* Named rendering pass indices. */
 
+/* Bionic's <limits.h> defines PASS_MAX. */
+#undef PASS_MAX
+
 enum
 {
     PASS_OPAQUE = 0,
