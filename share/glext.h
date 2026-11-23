@@ -15,6 +15,12 @@
 #ifndef GLEXT_H
 #define GLEXT_H
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#define ENABLE_GL4ES 1
+#else
+#define ENABLE_GL4ES 0
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Include the system OpenGL headers.                                        */
 
@@ -163,7 +169,7 @@ int glext_init(void);
 /* of the extensions we use. Otherwise, GetProc them regardless of whether   */
 /* they need it or not.                                                      */
 
-#if ENABLE_OPENGLES || defined(__EMSCRIPTEN__)
+#if ENABLE_OPENGLES || ENABLE_GL4ES
 
 #define glClientActiveTexture_ glClientActiveTexture
 #define glActiveTexture_       glActiveTexture
@@ -176,7 +182,7 @@ int glext_init(void);
 #define glPointParameterfv_    glPointParameterfv
 #define glPointParameterf_     glPointParameterf
 
-#ifdef __EMSCRIPTEN__
+#if ENABLE_GL4ES
 #define glOrtho_                    glOrtho
 #define glBindFramebuffer_          glBindFramebuffer
 #define glDeleteFramebuffers_       glDeleteFramebuffers
@@ -301,7 +307,7 @@ extern PFNGLSTRINGMARKERGREMEDY_PROC glStringMarkerGREMEDY_;
         glStringMarkerGREMEDY_(0, (s))
 
 /*---------------------------------------------------------------------------*/
-#endif /* ENABLE_OPENGLES || defined(__EMSCRIPTEN__) */
+#endif /* ENABLE_OPENGLES || ENABLE_GL4ES */
 
 void glClipPlane4f_(GLenum, GLfloat, GLfloat, GLfloat, GLfloat);
 void glBindTexture_(GLenum target, GLuint texture);

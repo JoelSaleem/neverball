@@ -23,7 +23,7 @@ struct gl_info gli;
 
 /*---------------------------------------------------------------------------*/
 
-#if !ENABLE_OPENGLES && !defined(__EMSCRIPTEN__)
+#if !ENABLE_OPENGLES && !ENABLE_GL4ES
 
 PFNGLCLIENTACTIVETEXTURE_PROC    glClientActiveTexture_;
 PFNGLACTIVETEXTURE_PROC          glActiveTexture_;
@@ -139,7 +139,7 @@ int glext_init(void)
     if (glext_check("GL_EXT_texture_filter_anisotropic"))
         gli.texture_filter_anisotropic = 1;
 
-#if defined(__EMSCRIPTEN__)
+#if ENABLE_GL4ES
     if (glext_check("ARB_framebuffer_object") ||
         glext_check("EXT_framebuffer_object"))
         gli.framebuffer_object = 1;
@@ -147,7 +147,7 @@ int glext_init(void)
 
     /* Desktop init. */
 
-#if !ENABLE_OPENGLES && !defined(__EMSCRIPTEN__)
+#if !ENABLE_OPENGLES && !ENABLE_GL4ES
     void *ptr = 0;
 
     if (glext_assert("ARB_multitexture"))
