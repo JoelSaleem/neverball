@@ -44,6 +44,9 @@ int  hmd_floor(float *F);
  */
 int  hmd_hand(float G[16], float v[3], float w[3], int *live);
 
+/* While on, hmd_ortho puts the GUI on the off-hand wrist instead. */
+void hmd_wrist(int on);
+
 /*---------------------------------------------------------------------------*/
 
 #endif

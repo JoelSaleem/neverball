@@ -29,5 +29,6 @@ void hmd_ortho(void) { }
 
 int  hmd_floor(float *F) { return 0; }
 int  hmd_hand(float G[16], float v[3], float w[3], int *live) { return 0; }
+void hmd_wrist(int on) { }
 
 /*---------------------------------------------------------------------------*/
