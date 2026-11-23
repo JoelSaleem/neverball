@@ -80,7 +80,7 @@ static float L[16];                     /* Starting head pose in space       */
 
 static XrActionSet action_set = XR_NULL_HANDLE;
 static XrAction    aim_action, select_action, back_action, menu_action, stick_action;
-static XrAction    live_action;
+static XrAction    live_action, height_action;
 static XrSpace     aim_space = XR_NULL_HANDLE;
 
 static float hand_G[16];
@@ -88,6 +88,8 @@ static float hand_v[3];
 static float hand_w[3];
 static int   hand_live = 0;
 static int   hand_ok = 0;
+
+static float course_h = 0.0f;           /* Course height, metres             */
 
 static float tilt_x = 0.0f;
 static float tilt_z = 0.0f;
@@ -205,12 +207,14 @@ static int init_input(void)
     menu_action   = make_action("menu",   XR_ACTION_TYPE_BOOLEAN_INPUT);
     stick_action  = make_action("stick",  XR_ACTION_TYPE_VECTOR2F_INPUT);
     live_action   = make_action("live",   XR_ACTION_TYPE_BOOLEAN_INPUT);
+    height_action = make_action("height", XR_ACTION_TYPE_BOOLEAN_INPUT);
 
     {
         const XrActionSuggestedBinding bindings[] = {
             { aim_action,    xr_path("/user/hand/right/input/aim/pose")      },
             { select_action, xr_path("/user/hand/right/input/a/click")       },
             { live_action,   xr_path("/user/hand/right/input/trigger/value") },
+            { height_action, xr_path("/user/hand/left/input/x/click")        },
             { back_action,   xr_path("/user/hand/right/input/b/click")       },
             { menu_action,   xr_path("/user/hand/left/input/menu/click")     },
             { stick_action,  xr_path("/user/hand/right/input/thumbstick")    },
@@ -347,6 +351,22 @@ static void step_input(void)
                 hand_v[0] = hand_v[1] = hand_v[2] = 0.0f;
             if (!(vel.velocityFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT))
                 hand_w[0] = hand_w[1] = hand_w[2] = 0.0f;
+        }
+
+        /* Course height: press X with the play hand where the ground goes. */
+
+        {
+            static int height_prev;
+            int height = get_bool(height_action);
+
+            if (height && !height_prev && hand_ok && floored)
+            {
+                course_h = SDL_clamp(hand_G[13], 0.0f, 1.5f);
+                config_set_d(CONFIG_COURSE_HEIGHT, (int) (course_h * 100.0f));
+                config_save();
+                log_printf("Course height %.2f m\n", course_h);
+            }
+            height_prev = height;
         }
 
         if (loc.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)
@@ -543,6 +563,8 @@ static int init_session(void)
         space = local;
 
     m_ident(L);
+
+    course_h = config_get_d(CONFIG_COURSE_HEIGHT) / 100.0f;
 
     return init_swapchains() && init_input();
 }
@@ -842,6 +864,7 @@ int hmd_hand(float G[16], float v[3], float w[3], int *live)
         return 0;
 
     memcpy(G, hand_G, sizeof (hand_G));
+    G[13] -= course_h;
     v_cpy(v, hand_v);
     v_cpy(w, hand_w);
     *live = hand_live;
@@ -872,6 +895,11 @@ int hmd_floor(float *F)
             F[12 + r] = -(F[r] * L[12] + F[4 + r] * L[13] + F[8 + r] * L[14]);
 
         F[15] = 1.0f;
+
+        /* Then raise the course to the course height. */
+
+        for (r = 0; r < 3; r++)
+            F[12 + r] += F[4 + r] * course_h;
     }
     return 1;
 }
