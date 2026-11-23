@@ -26,12 +26,73 @@
 #include <shlobj.h>
 #endif
 
+#ifdef __ANDROID__
+#include <SDL.h>
+#include <sys/stat.h>
+#endif
+
 /*---------------------------------------------------------------------------*/
+
+#ifdef __ANDROID__
+/*
+ * The APK ships the game data as one zip asset. Copy it out to internal
+ * storage whenever its size changes, so the archive scanner can mount it.
+ */
+static const char *android_data_path(void)
+{
+    static char dir[MAXSTR];
+    char dst[MAXSTR];
+    struct stat st;
+    SDL_RWops *src;
+    FILE *out;
+
+    SAFECPY(dir, SDL_AndroidGetInternalStoragePath());
+    SAFECAT(dir, "/data");
+    mkdir(dir, 0700);
+
+    SAFECPY(dst, dir);
+    SAFECAT(dst, "/neverball-data.zip");
+
+    if (!(src = SDL_RWFromFile("neverball-data.zip", "rb")))
+    {
+        log_printf("Missing data asset: %s\n", SDL_GetError());
+        return dir;
+    }
+
+    if (stat(dst, &st) != 0 || st.st_size != SDL_RWsize(src))
+    {
+        static char buf[1 << 20];
+        size_t n;
+        int ok = 1;
+
+        log_printf("Unpacking game data to %s\n", dst);
+
+        if ((out = fopen(dst, "wb")))
+        {
+            while (ok && (n = SDL_RWread(src, buf, 1, sizeof (buf))) > 0)
+                ok = (fwrite(buf, 1, n, out) == n);
+
+            if (fclose(out) != 0 || !ok)
+            {
+                log_printf("Failure to unpack game data\n");
+                remove(dst);
+            }
+        }
+        else log_printf("Failure to open %s\n", dst);
+    }
+
+    SDL_RWclose(src);
+
+    return dir;
+}
+#endif
 
 static const char *pick_data_path(const char *arg_data_path)
 {
 #ifdef __EMSCRIPTEN__
     return "/data";
+#elif defined(__ANDROID__)
+    return android_data_path();
 #else
     static char dir[MAXSTR];
     char *env;
@@ -72,6 +133,8 @@ static const char *pick_home_path(void)
     }
     else
         return fs_base_dir();
+#elif defined(__ANDROID__)
+    return SDL_AndroidGetInternalStoragePath();
 #else
     const char *path;
 
