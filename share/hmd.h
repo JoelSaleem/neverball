@@ -30,6 +30,20 @@ void hmd_prep_right(void);
 void hmd_persp(float, float);
 void hmd_ortho(void);
 
+/*
+ * Return non-zero if the headset tracks the real floor. If F is given,
+ * fill it with the transform that takes the view hmd_persp loads (rooted
+ * at the starting head pose) to one rooted on the floor.
+ */
+int  hmd_floor(float *F);
+
+/*
+ * Play hand for Life-size play: G is the controller's aim pose on the
+ * floor in metres, v and w its linear and angular velocity, and live
+ * whether the trigger is held. Return zero if the hand is not tracked.
+ */
+int  hmd_hand(float G[16], float v[3], float w[3], int *live);
+
 /*---------------------------------------------------------------------------*/
 
 #endif
