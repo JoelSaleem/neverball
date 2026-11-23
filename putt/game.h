@@ -41,6 +41,8 @@ void  putt_load_objects(void);
 
 void  putt_draw(int, float);
 void  putt_putt(void);
+void  putt_stand(void);
+int   putt_putter(float);
 int   putt_step(const float[3], float);
 
 void  putt_update_view(float);

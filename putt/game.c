@@ -23,6 +23,7 @@
 #include "hole.h"
 #include "hud.h"
 #include "hmd.h"
+#include "log.h"
 #include "image.h"
 #include "audio.h"
 #include "config.h"
@@ -31,6 +32,12 @@
 #include "solid_draw.h"
 #include "solid_sim.h"
 #include "solid_all.h"
+
+#ifdef __ANDROID__
+#include <stdio.h>
+#include <string.h>
+#include <sys/system_properties.h>
+#endif
 
 /*---------------------------------------------------------------------------*/
 
@@ -56,6 +63,27 @@ static float jump_dt;                   /* Jump duration                     */
 static float jump_p[3];                 /* Jump destination                  */
 
 static float idle_t;                    /* Idling timeout                    */
+
+/* Life-size play: the ball is a golf ball and the player swings a Putter. */
+
+#define PUTT_SCALE    0.341f            /* Metres per unit                   */
+#define PUTTER_LENGTH 0.85f             /* Hand to head, metres              */
+#define PUTTER_REACH  0.035f            /* Contact radius of the head        */
+#define PUTTER_GAIN   1.3f              /* Ball speed per head speed         */
+#define PUTTER_MAX    6.0f              /* Ball speed cap, metres/second     */
+#define STANCE        0.35f             /* Distance beside the ball, metres  */
+#define BLINK_TIME    0.2f
+
+static float stand[3];                  /* Player position                   */
+static int   stand_e;                   /* Player position set flag          */
+static float blink_t;                   /* Blink-follow time remaining       */
+
+static float putter_G[16];              /* Play hand pose on the floor       */
+static int   putter_e;                  /* Play hand tracked flag            */
+static int   putter_live;               /* Putter Live flag                  */
+
+static float swing_v[3];                /* Ball velocity of a Swing          */
+static int   swing_e;                   /* Swing pending flag                */
 
 /*---------------------------------------------------------------------------*/
 
@@ -88,6 +116,9 @@ static void view_init(void)
 
 int putt_init(const char *s)
 {
+    stand_e = 0;
+    swing_e = 0;
+
     int i;
 
     jump_e = 1;
@@ -280,6 +311,72 @@ static void game_shadow_conf(int enable)
     }
 }
 
+/* Draw a box from its centre and three half-extent axes. */
+
+static void draw_box(const float c[3], const float x[3],
+                     const float y[3], const float z[3])
+{
+    static const int faces[6][4] = {
+        { 1, 3, 7, 5 }, { 0, 4, 6, 2 }, { 2, 6, 7, 3 },
+        { 0, 1, 5, 4 }, { 4, 5, 7, 6 }, { 0, 2, 3, 1 },
+    };
+    int i, j;
+
+    glBegin(GL_QUADS);
+    for (i = 0; i < 6; i++)
+        for (j = 0; j < 4; j++)
+        {
+            const int k = faces[i][j];
+            const float sx = (k & 1) ? 1.0f : -1.0f;
+            const float sy = (k & 2) ? 1.0f : -1.0f;
+            const float sz = (k & 4) ? 1.0f : -1.0f;
+
+            glVertex3f(c[0] + sx * x[0] + sy * y[0] + sz * z[0],
+                       c[1] + sx * x[1] + sy * y[1] + sz * z[1],
+                       c[2] + sx * x[2] + sy * y[2] + sz * z[2]);
+        }
+    glEnd();
+}
+
+/* Draw the Putter in floor coordinates, a ghost unless it is Live. */
+
+static void putter_draw(void)
+{
+    const float *X = putter_G + 0, *Y = putter_G + 4, *Z = putter_G + 8;
+    const float *p = putter_G + 12;
+    const float a = putter_live ? 1.0f : 0.35f;
+    float c[3], x[3], y[3], z[3];
+
+    if (!putter_e)
+        return;
+
+    glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
+    {
+        glDisable(GL_TEXTURE_2D);
+        glDisable(GL_LIGHTING);
+        glEnable(GL_BLEND);
+
+        /* Shaft, down the controller's pointing axis. */
+
+        v_mad(c, p, Z, -0.5f * PUTTER_LENGTH);
+        v_scl(x, X, 0.008f);
+        v_scl(y, Y, 0.008f);
+        v_scl(z, Z, 0.5f * PUTTER_LENGTH);
+        glColor4f(0.75f, 0.75f, 0.8f, a);
+        draw_box(c, x, y, z);
+
+        /* Head. */
+
+        v_mad(c, p, Z, -PUTTER_LENGTH);
+        v_scl(x, X, 0.05f);
+        v_scl(y, Y, 0.015f);
+        v_scl(z, Z, 0.015f);
+        glColor4f(0.2f, 0.2f, 0.25f, a);
+        draw_box(c, x, y, z);
+    }
+    glPopAttrib();
+}
+
 void putt_draw(int pose, float t)
 {
     const float light_p[4] = { 8.f, 32.f, 8.f, 0.f };
@@ -288,8 +385,15 @@ void putt_draw(int pose, float t)
     struct s_rend rend;
 
     float fov = FOV;
+    float F[16];
+    int   life;
 
     if (!state)
+        return;
+
+    /* Blink-follow shows nothing while the player is moved. */
+
+    if ((life = stand_e && hmd_floor(F)) && blink_t > 0.0f)
         return;
 
     fp->shadow_ui = ball;
@@ -316,15 +420,28 @@ void putt_draw(int pose, float t)
 
         v_sub(v, c, view_p);
 
-        glTranslatef(0.f, 0.f, -v_len(v));
-        glMultMatrixf(M);
-        glTranslatef(-c[0], -c[1], -c[2]);
+        if (life)
+        {
+            glMultMatrixf(F);
+            glPushMatrix();
+            glScalef(PUTT_SCALE, PUTT_SCALE, PUTT_SCALE);
+            glTranslatef(-stand[0], -stand[1], -stand[2]);
+        }
+        else
+        {
+            glTranslatef(0.f, 0.f, -v_len(v));
+            glMultMatrixf(M);
+            glTranslatef(-c[0], -c[1], -c[2]);
+        }
 
         /* Center the skybox about the position of the camera. */
 
         glPushMatrix();
         {
-            glTranslatef(view_p[0], view_p[1], view_p[2]);
+            if (life)
+                glTranslatef(stand[0], stand[1], stand[2]);
+            else
+                glTranslatef(view_p[0], view_p[1], view_p[2]);
             back_draw(&rend);
         }
         glPopMatrix();
@@ -355,6 +472,12 @@ void putt_draw(int pose, float t)
         glDepthMask(GL_TRUE);
 
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+        if (life)
+        {
+            glPopMatrix();
+            putter_draw();
+        }
     }
     glPopMatrix();
     video_pop_matrix();
@@ -571,6 +694,17 @@ int putt_step(const float g[3], float dt)
 
 void putt_putt(void)
 {
+    if (swing_e)
+    {
+        file.vary.uv[ball].v[0] = swing_v[0];
+        file.vary.uv[ball].v[1] = swing_v[1] + BALL_FUDGE;
+        file.vary.uv[ball].v[2] = swing_v[2];
+
+        swing_e = 0;
+        view_m  = 0.f;
+        return;
+    }
+
     /*
      * HACK: The BALL_FUDGE here  guarantees that a putt doesn't drive
      * the ball  too directly down  toward a lump,  triggering rolling
@@ -585,6 +719,111 @@ void putt_putt(void)
 }
 
 /*---------------------------------------------------------------------------*/
+
+/*
+ * Blink-follow for a new Stroke: stand beside the stopped ball, square to
+ * the line to the hole with the hole on the player's left.
+ */
+void putt_stand(void)
+{
+    const float *p = file.vary.uv[ball].p;
+    float d[3] = { 0.0f, 0.0f, -1.0f };
+
+    if (!hmd_floor(NULL))
+        return;
+
+    if (file.base.zc)
+    {
+        v_sub(d, file.base.zv[0].p, p);
+        d[1] = 0.0f;
+    }
+    if (v_len(d) < 0.001f)
+    {
+        d[0] = 0.0f;
+        d[2] = -1.0f;
+    }
+    v_nrm(d, d);
+
+    stand[0] = p[0] + d[2] * STANCE / PUTT_SCALE;
+    stand[1] = p[1] - file.vary.uv[ball].r;
+    stand[2] = p[2] - d[0] * STANCE / PUTT_SCALE;
+
+    stand_e = 1;
+    blink_t = BLINK_TIME;
+
+    log_printf("Stand beside ball at %.1f %.1f %.1f\n", p[0], p[1], p[2]);
+}
+
+/*
+ * Track the Putter. Return non-zero when a Live head hits the ball, with
+ * the Stroke saved for putt_putt.
+ */
+int putt_putter(float dt)
+{
+    float v[3], w[3], r[3], h[3], hv[3], b[3], t[3], s;
+    const float *Z = putter_G + 8, *p = putter_G + 12;
+
+    if (blink_t > 0.0f)
+    {
+        blink_t -= dt;
+        return 0;
+    }
+
+#ifdef __ANDROID__
+    /* Testing without controllers: `setprop debug.neverball.swing "<id> <vx> <vz>"` m/s. */
+    {
+        static char last[PROP_VALUE_MAX];
+        char value[PROP_VALUE_MAX];
+        float vx, vz;
+
+        if (stand_e && __system_property_get("debug.neverball.swing", value) > 0 &&
+            strcmp(value, last) != 0 && sscanf(value, "%*s %f %f", &vx, &vz) == 2)
+        {
+            SDL_strlcpy(last, value, sizeof (last));
+            swing_v[0] = vx / PUTT_SCALE;
+            swing_v[1] = 0.0f;
+            swing_v[2] = vz / PUTT_SCALE;
+            swing_e = 1;
+            log_printf("Test Stroke %.1f %.1f m/s\n", vx, vz);
+            return 1;
+        }
+    }
+#endif
+
+    if (!stand_e || !(putter_e = hmd_hand(putter_G, v, w, &putter_live)))
+        return 0;
+
+    if (!putter_live)
+        return 0;
+
+    /* Head position and velocity on the floor. */
+
+    v_mad(h, p, Z, -PUTTER_LENGTH);
+    v_sub(r, h, p);
+    v_crs(hv, w, r);
+    v_add(hv, hv, v);
+    hv[1] = 0.0f;
+
+    /* Ball position on the floor. */
+
+    v_sub(b, file.vary.uv[ball].p, stand);
+    v_scl(b, b, PUTT_SCALE);
+    v_sub(t, b, h);
+
+    if (v_len(t) > PUTTER_REACH + file.vary.uv[ball].r * PUTT_SCALE ||
+        v_dot(hv, t) <= 0.0f || (s = v_len(hv)) < 0.1f)
+        return 0;
+
+    s = MIN(s * PUTTER_GAIN, PUTTER_MAX) / PUTT_SCALE;
+
+    v_nrm(hv, hv);
+    v_scl(swing_v, hv, s);
+    swing_e = 1;
+
+    log_printf("Stroke at %.2f m/s\n", s * PUTT_SCALE);
+
+    return 1;
+}
 
 void putt_set_rot(int d)
 {

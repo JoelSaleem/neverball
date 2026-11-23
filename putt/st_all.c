@@ -21,6 +21,7 @@
 #include "transition.h"
 #include "vec3.h"
 #include "game.h"
+#include "hmd.h"
 #include "hole.h"
 #include "audio.h"
 #include "course.h"
@@ -1018,6 +1019,7 @@ static int stroke_enter(struct state *st, struct state *prev, int intent)
 {
     putt_hud_init();
     putt_clr_mag();
+    putt_stand();
     config_set_d(CONFIG_CAMERA, 2);
     video_set_grab(1);
 
@@ -1064,6 +1066,9 @@ static void stroke_timer(int id, float dt)
     putt_step(g, dt);
 
     putt_hud_touch_timer(dt);
+
+    if (putt_putter(dt))
+        goto_state(&st_putt_roll);
 }
 
 static void stroke_point(int id, int x, int y, int dx, int dy)
@@ -1082,7 +1087,9 @@ static void stroke_stick(int id, int a, float v, int bump)
 
 static int stroke_click(int b, int d)
 {
-    return (d && b == SDL_BUTTON_LEFT) ? goto_state(&st_putt_roll) : 1;
+    /* Life-size Strokes come only from Swings. */
+
+    return (d && b == SDL_BUTTON_LEFT && !hmd_floor(NULL)) ? goto_state(&st_putt_roll) : 1;
 }
 
 static int stroke_buttn(int b, int d)
@@ -1091,7 +1098,7 @@ static int stroke_buttn(int b, int d)
     {
         if (config_tst_d(CONFIG_JOYSTICK_BUTTON_X, b))
             stroke_rotate_alt = 1;
-        if (config_tst_d(CONFIG_JOYSTICK_BUTTON_A, b))
+        if (config_tst_d(CONFIG_JOYSTICK_BUTTON_A, b) && !hmd_floor(NULL))
             return goto_state(&st_putt_roll);
         if (config_tst_d(CONFIG_JOYSTICK_BUTTON_START, b))
             return goto_putt_pause(&st_putt_over);
