@@ -17,6 +17,7 @@
 #include "hud.h"
 #include "hole.h"
 #include "config.h"
+#include "hmd.h"
 #include "video.h"
 #include "glext.h"
 #include "geom.h"
@@ -170,6 +171,8 @@ void putt_hud_joystick_set(int active, float ox, float oy, float kx, float ky, f
 
 void putt_hud_paint(void)
 {
+    hmd_wrist(1);
+
     if (config_get_d(CONFIG_FPS))
     {
         gui_set_count(fps_id, video_perf());
@@ -184,6 +187,8 @@ void putt_hud_paint(void)
         joystick_draw(joystick.ox, joystick.oy,
                       joystick.kx, joystick.ky,
                       joystick.rb, joystick.rk);
+
+    hmd_wrist(0);
 }
 
 /*---------------------------------------------------------------------------*/
