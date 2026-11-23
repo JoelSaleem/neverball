@@ -47,6 +47,7 @@ int CONFIG_MOUSE_RESPONSE;
 int CONFIG_MOUSE_INVERT;
 int CONFIG_VSYNC;
 int CONFIG_HMD;
+int CONFIG_COURSE_HEIGHT;
 int CONFIG_HIGHDPI;
 int CONFIG_MOUSE_CAMERA_1;
 int CONFIG_MOUSE_CAMERA_2;
@@ -180,6 +181,7 @@ static struct
 #else
     { &CONFIG_HMD,          "hmd",          0 },
 #endif
+    { &CONFIG_COURSE_HEIGHT, "course_height", 0 },
     { &CONFIG_HIGHDPI,      "highdpi",      1 },
 
     { &CONFIG_MOUSE_CAMERA_1,      "mouse_camera_1",      0 },
