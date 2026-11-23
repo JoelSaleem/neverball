@@ -80,7 +80,8 @@ static float L[16];                     /* Starting head pose in space       */
 
 static XrActionSet action_set = XR_NULL_HANDLE;
 static XrAction    aim_action, select_action, back_action, menu_action, stick_action;
-static XrAction    live_action, height_action;
+static XrAction    live_action, wrist_action, height_action;
+static XrSpace     wrist_space = XR_NULL_HANDLE;
 static XrSpace     aim_space = XR_NULL_HANDLE;
 
 static float hand_G[16];
@@ -88,6 +89,10 @@ static float hand_v[3];
 static float hand_w[3];
 static int   hand_live = 0;
 static int   hand_ok = 0;
+
+static float wrist_G[16];               /* Off-hand grip pose in space       */
+static int   wrist_ok = 0;
+static int   wrist_on = 0;
 
 static float course_h = 0.0f;           /* Course height, metres             */
 
@@ -207,6 +212,7 @@ static int init_input(void)
     menu_action   = make_action("menu",   XR_ACTION_TYPE_BOOLEAN_INPUT);
     stick_action  = make_action("stick",  XR_ACTION_TYPE_VECTOR2F_INPUT);
     live_action   = make_action("live",   XR_ACTION_TYPE_BOOLEAN_INPUT);
+    wrist_action  = make_action("wrist",  XR_ACTION_TYPE_POSE_INPUT);
     height_action = make_action("height", XR_ACTION_TYPE_BOOLEAN_INPUT);
 
     {
@@ -214,6 +220,7 @@ static int init_input(void)
             { aim_action,    xr_path("/user/hand/right/input/aim/pose")      },
             { select_action, xr_path("/user/hand/right/input/a/click")       },
             { live_action,   xr_path("/user/hand/right/input/trigger/value") },
+            { wrist_action,  xr_path("/user/hand/left/input/grip/pose")      },
             { height_action, xr_path("/user/hand/left/input/x/click")        },
             { back_action,   xr_path("/user/hand/right/input/b/click")       },
             { menu_action,   xr_path("/user/hand/left/input/menu/click")     },
@@ -239,6 +246,11 @@ static int init_input(void)
         info.poseInActionSpace.orientation.w = 1.0f;
 
         if (!xr_check(xrCreateActionSpace(session, &info, &aim_space), "xrCreateActionSpace"))
+            return 0;
+
+        info.action = wrist_action;
+
+        if (!xr_check(xrCreateActionSpace(session, &info, &wrist_space), "xrCreateActionSpace"))
             return 0;
     }
 
@@ -306,6 +318,17 @@ static void step_input(void)
     }
 
     hand_live = get_bool(live_action);
+
+    {
+        XrSpaceLocation loc = { XR_TYPE_SPACE_LOCATION };
+        const XrSpaceLocationFlags valid = XR_SPACE_LOCATION_POSITION_VALID_BIT |
+                                           XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+
+        xrLocateSpace(wrist_space, space, frame.predictedDisplayTime, &loc);
+
+        if ((wrist_ok = (loc.locationFlags & valid) == valid))
+            pose_matrix(wrist_G, loc.pose, 0);
+    }
 
     track_button(select_action, config_get_d(CONFIG_JOYSTICK_BUTTON_A),     &select_prev);
     track_button(back_action,   config_get_d(CONFIG_JOYSTICK_BUTTON_B),     &back_prev);
@@ -704,6 +727,8 @@ void hmd_free(void)
     local       = XR_NULL_HANDLE;
     floored     = 0;
     aim_space   = XR_NULL_HANDLE;
+    wrist_space = XR_NULL_HANDLE;
+    wrist_ok    = 0;
     action_set  = XR_NULL_HANDLE;
     running     = 0;
     focused     = 0;
@@ -904,6 +929,11 @@ int hmd_floor(float *F)
     return 1;
 }
 
+void hmd_wrist(int on)
+{
+    wrist_on = on;
+}
+
 void hmd_ortho(void)
 {
     /* Put the 2D GUI on a panel one metre in front of the start pose. */
@@ -919,8 +949,31 @@ void hmd_ortho(void)
 
     hmd_persp(0.1f, 10.0f);
 
-    glScalef    ( 1.25f / h,  1.25f / h,  1.0f);
-    glTranslatef(-0.50f * w, -0.50f * h, -1.0f);
+    if (wrist_on && wrist_ok)
+    {
+        /*
+         * A watch face on the back of the left wrist: GUI x runs toward
+         * the fingers (-Z), y up from the thumb (+Y), z out of the back
+         * of the hand (+X).
+         */
+
+        static const float B[16] = {
+            0, 0, -1, 0,   0, 1, 0, 0,   1, 0, 0, 0,   0, 0, 0, 1
+        };
+        const float s = 0.16f / w;
+
+        glLoadMatrixf(M);
+        glMultMatrixf(wrist_G);
+        glTranslatef(0.04f, 0.0f, 0.10f);
+        glMultMatrixf(B);
+        glScalef(s, s, s);
+        glTranslatef(-0.50f * w, -0.50f * h, 0.0f);
+    }
+    else
+    {
+        glScalef    ( 1.25f / h,  1.25f / h,  1.0f);
+        glTranslatef(-0.50f * w, -0.50f * h, -1.0f);
+    }
 
     glClipPlane(GL_CLIP_PLANE0, edges[0]);
     glClipPlane(GL_CLIP_PLANE1, edges[1]);
