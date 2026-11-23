@@ -18,6 +18,8 @@
 
 #include "glext.h"
 #include "vec3.h"
+#include "hmd.h"
+#include "log.h"
 #include "geom.h"
 #include "part.h"
 #include "ball.h"
@@ -340,6 +342,9 @@ int  game_client_init(const char *file_name)
     coins  = 0;
     status = GAME_NONE;
 
+    gd.stand_e = 0;
+    gd.blink_t = 0.0f;
+
     game_client_free(file_name);
 
     /* Load SOL data. */
@@ -491,6 +496,61 @@ void game_client_draw(int pose, float t)
         game_lerp_apply(&gl, &gd);
         game_draw(&gd, pose, t);
     }
+}
+
+/*---------------------------------------------------------------------------*/
+
+#define BLINK_DIST  (1.5f / LIFE_SIZE_SCALE)  /* Ball distance that blinks    */
+#define BLINK_STAND (0.8f / LIFE_SIZE_SCALE)  /* Distance to stand from ball  */
+#define BLINK_TIME   0.2f
+
+/*
+ * Blink-follow: once the ball rolls too far from the player, black out
+ * briefly and stand the player beside it again. Return non-zero while
+ * blinking; the caller freezes the ball and the clock meanwhile.
+ */
+int game_client_blink(float dt)
+{
+    const float *p = gd.vary.uv[0].p;
+    float d[3];
+
+    if (!gd.state || !hmd_floor(NULL))
+        return 0;
+
+    if (gd.blink_t > 0.0f)
+        return (gd.blink_t -= dt) > 0.0f;
+
+    if (gd.stand_e)
+    {
+        v_sub(d, p, gd.stand);
+        d[1] = 0.0f;
+
+        if (v_len(d) < BLINK_DIST)
+            return 0;
+
+        gd.blink_t = BLINK_TIME;
+        log_printf("Blink-follow to ball at %.1f %.1f %.1f\n", p[0], p[1], p[2]);
+    }
+    else
+    {
+        /* Start behind the ball, facing the way the level camera faces. */
+
+        v_sub(d, gd.view.c, gd.view.p);
+        d[1] = 0.0f;
+    }
+
+    if (v_len(d) < 0.001f)
+    {
+        d[0] = 0.0f;
+        d[2] = -1.0f;
+    }
+    v_nrm(d, d);
+
+    v_mad(gd.stand, p, d, -BLINK_STAND);
+    gd.stand[1] = p[1] - gd.vary.uv[0].r;
+    gd.stand_e  = 1;
+
+    return gd.blink_t > 0.0f;
 }
 
 /*---------------------------------------------------------------------------*/

@@ -459,7 +459,8 @@ static void play_loop_timer(int id, float dt)
 
     game_step_fade(dt);
 
-    game_server_step(dt);
+    if (!game_client_blink(dt))
+        game_server_step(dt);
     game_client_sync(demo_fp);
     game_client_blend(game_server_blend());
 

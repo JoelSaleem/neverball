@@ -17,6 +17,7 @@
 #include <assert.h>
 
 #include "vec3.h"
+#include "hmd.h"
 #include "geom.h"
 #include "config.h"
 #include "binary.h"
@@ -807,7 +808,15 @@ static int game_step(const float g[3], float dt, int bt)
         tilt.rx += (input_get_x() - tilt.rx) * dt / MAX(dt, input_get_s());
         tilt.rz += (input_get_z() - tilt.rz) * dt / MAX(dt, input_get_s());
 
-        game_tilt_axes(&tilt, view.e);
+        if (hmd_floor(NULL))
+        {
+            /* Life-size: Hand tilt is measured in world axes. */
+
+            float E[3][3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+
+            game_tilt_axes(&tilt, E);
+        }
+        else game_tilt_axes(&tilt, view.e);
 
         game_cmd_tiltaxes();
         game_cmd_tiltangles();

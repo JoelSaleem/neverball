@@ -27,7 +27,15 @@ struct game_draw
 
     float fade_k;                       /* Fade in/out level                 */
     float fade_d;                       /* Fade in/out direction             */
+
+    float stand[3];                     /* Life-size player position         */
+    int   stand_e;                      /* Player position set flag          */
+    float blink_t;                      /* Blink-follow time remaining       */
 };
+
+/* Life-size world scale in metres per unit: the ball is a bowling ball. */
+
+#define LIFE_SIZE_SCALE 0.44f
 
 /* FIXME: this is just for POSE_* constants. */
 #include "game_client.h"

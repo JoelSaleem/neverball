@@ -13,6 +13,7 @@
  */
 
 #include "vec3.h"
+#include "hmd.h"
 #include "glext.h"
 #include "ball.h"
 #include "part.h"
@@ -481,6 +482,12 @@ void game_draw(struct game_draw *gd, int pose, float t)
     {
         const struct game_view *view = &gd->view;
         struct s_rend rend;
+        float F[16];
+
+        /* Blink-follow shows nothing while the player is moved. */
+
+        if (gd->blink_t > 0.0f)
+            return;
 
         gd->draw.shadow_ui = 0;
 
@@ -503,13 +510,22 @@ void game_draw(struct game_draw *gd, int pose, float t)
 
             m_xps(M, T);
 
-            /* Apply the current view. */
+            /* Apply the current view, or stand the player in the level. */
 
-            v_sub(v, view->c, view->p);
+            if (gd->stand_e && hmd_floor(F))
+            {
+                glMultMatrixf(F);
+                glScalef(LIFE_SIZE_SCALE, LIFE_SIZE_SCALE, LIFE_SIZE_SCALE);
+                glTranslatef(-gd->stand[0], -gd->stand[1], -gd->stand[2]);
+            }
+            else
+            {
+                v_sub(v, view->c, view->p);
 
-            glTranslatef(0.f, 0.f, -v_len(v));
-            glMultMatrixf(M);
-            glTranslatef(-view->c[0], -view->c[1], -view->c[2]);
+                glTranslatef(0.f, 0.f, -v_len(v));
+                glMultMatrixf(M);
+                glTranslatef(-view->c[0], -view->c[1], -view->c[2]);
+            }
 
             /* Draw the background. */
 
