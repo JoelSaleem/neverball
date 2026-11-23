@@ -21,6 +21,7 @@
 #include "gui.h"
 #include "progress.h"
 #include "config.h"
+#include "hmd.h"
 #include "video.h"
 #include "audio.h"
 
@@ -174,6 +175,8 @@ void hud_free(void)
 
 void hud_paint(void)
 {
+    hmd_wrist(1);
+
     if (curr_mode() == MODE_CHALLENGE)
         gui_paint(Lhud_id);
 
@@ -186,6 +189,8 @@ void hud_paint(void)
     hud_cam_paint();
     hud_speed_paint();
     hud_touch_paint();
+
+    hmd_wrist(0);
 }
 
 void hud_update(int pulse)
