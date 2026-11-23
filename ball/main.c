@@ -214,6 +214,26 @@ static void opt_init(int argc, char **argv)
 #undef opt_usage
 #undef opt_error
 
+#ifdef __ANDROID__
+#include <sys/system_properties.h>
+
+/*
+ * Android passes no arguments:
+ * `adb shell setprop debug.neverball.level <sol>` or `debug.neverball.putt 1`.
+ */
+static void opt_android(void)
+{
+    static char level[PROP_VALUE_MAX];
+    char putt[PROP_VALUE_MAX];
+
+    if (__system_property_get("debug.neverball.level", level) > 0)
+        opt_level = level;
+
+    if (__system_property_get("debug.neverball.putt", putt) > 0 && putt[0] == '1')
+        opt_game = GAME_PUTT;
+}
+#endif
+
 static void opt_quit(void)
 {
     opt_data = NULL;
@@ -935,6 +955,9 @@ static int main_init(int argc, char *argv[])
     srand((unsigned int) time(NULL));
 
     opt_init(argc, argv);
+#ifdef __ANDROID__
+    opt_android();
+#endif
 
     config_paths(opt_data);
     log_init("Neverball " VERSION, "neverball.log");
