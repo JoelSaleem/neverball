@@ -415,15 +415,22 @@ int  video_perf(void)
 void video_swap(void)
 {
     int dt;
+    int hmd = hmd_stat();
 
-    if (hmd_stat())
+    if (hmd)
         hmd_swap();
 
     /* Take a screenshot of the complete back buffer and swap it. */
+    /* On Quest the OpenXR compositor presents the frame instead.  */
 
-    snapshot_take();
+#ifdef __ANDROID__
+    if (!hmd)
+#endif
+    {
+        snapshot_take();
 
-    SDL_GL_SwapWindow(window);
+        SDL_GL_SwapWindow(window);
+    }
 
     /* Accumulate time passed and frames rendered. */
 
