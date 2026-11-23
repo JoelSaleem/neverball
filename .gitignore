@@ -42,3 +42,5 @@ autosave
 /tests/test
 /tests/test.exe
 /.playwright-mcp
+/build-android/
+/neverball-quest.apk*
