@@ -971,7 +971,11 @@ void hmd_ortho(void)
     }
     else
     {
-        glScalef    ( 1.25f / h,  1.25f / h,  1.0f);
+        /* A HUD without a tracked wrist is smaller, to bring its corners into view. */
+
+        const float s = (wrist_on ? 0.60f : 1.25f) / h;
+
+        glScalef    (s, s, 1.0f);
         glTranslatef(-0.50f * w, -0.50f * h, -1.0f);
     }
 
