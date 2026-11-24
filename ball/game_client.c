@@ -512,7 +512,7 @@ void game_client_draw(int pose, float t)
 int game_client_blink(float dt)
 {
     const float *p = gd.vary.uv[0].p;
-    float d[3];
+    float d[3], y;
 
     if (!gd.state || !hmd_floor(NULL))
         return 0;
@@ -529,7 +529,6 @@ int game_client_blink(float dt)
             return 0;
 
         gd.blink_t = BLINK_TIME;
-        log_printf("Blink-follow to ball at %.1f %.1f %.1f\n", p[0], p[1], p[2]);
     }
     else
     {
@@ -546,9 +545,16 @@ int game_client_blink(float dt)
     }
     v_nrm(d, d);
 
+    /* Keep the player at the height of the floor the ball started on. */
+
+    y = gd.stand_e ? gd.stand[1] : p[1] - gd.vary.uv[0].r;
+
     v_mad(gd.stand, p, d, -BLINK_STAND);
-    gd.stand[1] = p[1] - gd.vary.uv[0].r;
+    gd.stand[1] = y;
     gd.stand_e  = 1;
+
+    log_printf("Stand at %.1f %.1f %.1f, ball at %.1f %.1f %.1f\n",
+               gd.stand[0], gd.stand[1], gd.stand[2], p[0], p[1], p[2]);
 
     return gd.blink_t > 0.0f;
 }
