@@ -500,9 +500,12 @@ void game_client_draw(int pose, float t)
 
 /*---------------------------------------------------------------------------*/
 
-#define BLINK_DIST  (1.5f / LIFE_SIZE_SCALE)  /* Ball distance that blinks    */
-#define BLINK_STAND (0.8f / LIFE_SIZE_SCALE)  /* Distance to stand from ball  */
+#define BLINK_DIST  (3.0f / LIFE_SIZE_SCALE)  /* Ball distance that blinks    */
+#define BLINK_STAND (1.0f / LIFE_SIZE_SCALE)  /* Distance to stand from ball  */
 #define BLINK_TIME   0.2f
+#define BLINK_GAP    3.0f                     /* Least time between blinks    */
+
+static float blink_wait;
 
 /*
  * Blink-follow: once the ball rolls too far from the player, black out
@@ -522,6 +525,9 @@ int game_client_blink(float dt)
 
     if (gd.stand_e)
     {
+        if ((blink_wait -= dt) > 0.0f)
+            return 0;
+
         v_sub(d, p, gd.stand);
         d[1] = 0.0f;
 
@@ -529,6 +535,7 @@ int game_client_blink(float dt)
             return 0;
 
         gd.blink_t = BLINK_TIME;
+        blink_wait = BLINK_GAP;
     }
     else
     {
@@ -536,6 +543,8 @@ int game_client_blink(float dt)
 
         v_sub(d, gd.view.c, gd.view.p);
         d[1] = 0.0f;
+
+        blink_wait = 0.0f;
     }
 
     if (v_len(d) < 0.001f)
