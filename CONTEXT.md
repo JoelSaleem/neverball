@@ -29,6 +29,10 @@ _Avoid_: zoom, scale factor
 The height of the course's ground relative to the real floor, set by the player: above it for seated play, below it to look down on the course from higher up.
 _Avoid_: floor offset, seated mode
 
+**Board turn**:
+A 45 degree snap of the course about the player, from the off-hand stick, so the player can face along any part of the course without turning round.
+_Avoid_: snap turn, camera rotation
+
 **Chase view**:
 The flat-screen camera that follows the ball, which this port replaces.
 _Avoid_: HMD mode, VR mode
@@ -102,6 +106,7 @@ _Avoid_: flick, gesture
 - A **Stroke** has exactly one **Aim** and one **Strength**
 - **Strength** is the **Putter** head's speed at contact, up to a cap; **Aim** is its direction of travel
 - **Hand tilt** drives **Tilt**; **Neverball** has no **Strength**
+- **Hand tilt** and the **Putter** are measured against the turned course, so tilting away from the player always rolls the ball away from them
 - In **Life-size** **Neverball**, **Tilt** visibly rotates the level about the player, who stays upright on a floor that does not move under them
 - **Blink-follow** is the only way the game moves the player; in **Neverball** the player stands still for the whole level
 - Each **Neverputt** player has their own **Course height** and **Play hand**, applied at their **Hand-off**

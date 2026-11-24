@@ -95,6 +95,7 @@ static int   wrist_ok = 0;
 static int   wrist_on = 0;
 
 static float course_h = 0.0f;           /* Course height, metres             */
+static float board_a  = 0.0f;           /* Board turn about the player, deg  */
 
 static float tilt_x = 0.0f;
 static float tilt_z = 0.0f;
@@ -293,6 +294,18 @@ static int stick_dir(float v, int prev)
     return (v < -0.6f) ? -1 : (v > 0.6f) ? +1 : (fabsf(v) < 0.4f) ? 0 : prev;
 }
 
+/* Turn a vector from the room into the board's axes. */
+
+static void unturn(float v[3])
+{
+    const float c = cosf(V_RAD(board_a));
+    const float s = sinf(V_RAD(board_a));
+    const float x = v[0];
+
+    v[0] = c * x - s * v[2];
+    v[2] = s * x + c * v[2];
+}
+
 static void track_stick_axis(float v, int neg, int pos, int *prev)
 {
     /* Reported as D-pad presses. */
@@ -358,16 +371,19 @@ static void step_input(void)
                          config_get_d(CONFIG_JOYSTICK_DPAD_D), &y_prev);
     }
 
-    /* Off-hand stick: push up or down to raise or lower the board 25 cm. */
+    /*
+     * Off-hand stick: flick left or right to turn the board 45 degrees
+     * about the player, up or down to raise or lower it 25 cm.
+     */
 
     if (floored)
     {
-        static int by_prev;
+        static int bx_prev, by_prev;
 
         XrActionStateGetInfo info = { XR_TYPE_ACTION_STATE_GET_INFO };
         XrActionStateVector2f stick = { XR_TYPE_ACTION_STATE_VECTOR2F };
         char value[PROP_VALUE_MAX];
-        int by;
+        int bx, by;
 
         info.action = board_action;
         xrGetActionStateVector2f(session, &info, &stick);
@@ -377,8 +393,14 @@ static void step_input(void)
         if (__system_property_get("debug.neverball.board", value) > 0)
             sscanf(value, "%f %f", &stick.currentState.x, &stick.currentState.y);
 
+        bx = stick_dir(stick.currentState.x, bx_prev);
         by = stick_dir(stick.currentState.y, by_prev);
 
+        if (bx && !bx_prev)
+        {
+            board_a = fmodf(board_a - 45.0f * bx, 360.0f);
+            log_printf("Board turned to %.0f degrees\n", board_a);
+        }
         if (by && !by_prev)
         {
             course_h = SDL_clamp(course_h + 0.25f * by, -3.0f, 1.5f);
@@ -386,6 +408,7 @@ static void step_input(void)
             config_save();
             log_printf("Course height %.2f m\n", course_h);
         }
+        bx_prev = bx;
         by_prev = by;
     }
 
@@ -442,9 +465,18 @@ static void step_input(void)
              * (cos x sin z, cos x cos z, -sin x).
              */
 
-            float nx =     2 * (q.x * q.y - q.z * q.w);
-            float ny = 1 - 2 * (q.x * q.x + q.z * q.z);
-            float nz =     2 * (q.y * q.z + q.x * q.w);
+            float n[3] = {
+                    2 * (q.x * q.y - q.z * q.w),
+                1 - 2 * (q.x * q.x + q.z * q.z),
+                    2 * (q.y * q.z + q.x * q.w),
+            };
+            float nx, ny, nz;
+
+            unturn(n);
+
+            nx = n[0];
+            ny = n[1];
+            nz = n[2];
 
             tilt_x = -V_DEG(asinf(nz));
             tilt_z =  V_DEG(atan2f(nx, ny));
@@ -932,6 +964,13 @@ int hmd_hand(float G[16], float v[3], float w[3], int *live)
     G[13] -= course_h;
     v_cpy(v, hand_v);
     v_cpy(w, hand_w);
+
+    unturn(G + 0);
+    unturn(G + 4);
+    unturn(G + 8);
+    unturn(G + 12);
+    unturn(v);
+    unturn(w);
     *live = hand_live;
     return 1;
 }
@@ -965,6 +1004,21 @@ int hmd_floor(float *F)
 
         for (r = 0; r < 3; r++)
             F[12 + r] += F[4 + r] * course_h;
+
+        /* And turn it about the player: F = L^-1 T(0, h, 0) Ry(a). */
+
+        {
+            const float c = cosf(V_RAD(board_a));
+            const float s = sinf(V_RAD(board_a));
+
+            for (r = 0; r < 3; r++)
+            {
+                const float x = F[r], z = F[8 + r];
+
+                F[r]     = c * x - s * z;
+                F[8 + r] = s * x + c * z;
+            }
+        }
     }
     return 1;
 }
