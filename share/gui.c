@@ -32,6 +32,7 @@
 #include "transition.h"
 
 #include "fs.h"
+#include "hmd.h"
 
 /*---------------------------------------------------------------------------*/
 
@@ -2039,6 +2040,9 @@ static void gui_paint_text(int id);
 
 static void gui_paint_array(int id)
 {
+    /* A scissor box is in window pixels, which an HMD's GUI panel is not. */
+
+    const int clip = (widget[id].flags & GUI_CLIP) && !hmd_stat();
     int jd;
 
     glPushMatrix();
@@ -2056,7 +2060,7 @@ static void gui_paint_array(int id)
 
         /* Recursively paint all subwidgets. */
 
-        if (widget[id].flags & GUI_CLIP)
+        if (clip)
         {
             glScissor(
                 widget[id].x + widget[id].offset_x,
@@ -2070,7 +2074,7 @@ static void gui_paint_array(int id)
         for (jd = widget[id].car; jd; jd = widget[jd].cdr)
             gui_paint_text(jd);
 
-        if (widget[id].flags & GUI_CLIP)
+        if (clip)
         {
             glDisable(GL_SCISSOR_TEST);
         }
