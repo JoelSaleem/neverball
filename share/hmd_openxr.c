@@ -80,7 +80,7 @@ static float L[16];                     /* Starting head pose in space       */
 
 static XrActionSet action_set = XR_NULL_HANDLE;
 static XrAction    aim_action, select_action, back_action, menu_action, stick_action;
-static XrAction    live_action, wrist_action, height_action;
+static XrAction    live_action, wrist_action, height_action, board_action;
 static XrSpace     wrist_space = XR_NULL_HANDLE;
 static XrSpace     aim_space = XR_NULL_HANDLE;
 
@@ -214,6 +214,7 @@ static int init_input(void)
     live_action   = make_action("live",   XR_ACTION_TYPE_BOOLEAN_INPUT);
     wrist_action  = make_action("wrist",  XR_ACTION_TYPE_POSE_INPUT);
     height_action = make_action("height", XR_ACTION_TYPE_BOOLEAN_INPUT);
+    board_action  = make_action("board",  XR_ACTION_TYPE_VECTOR2F_INPUT);
 
     {
         const XrActionSuggestedBinding bindings[] = {
@@ -225,6 +226,7 @@ static int init_input(void)
             { back_action,   xr_path("/user/hand/right/input/b/click")       },
             { menu_action,   xr_path("/user/hand/left/input/menu/click")     },
             { stick_action,  xr_path("/user/hand/right/input/thumbstick")    },
+            { board_action,  xr_path("/user/hand/left/input/thumbstick")     },
         };
         XrInteractionProfileSuggestedBinding suggested = {
             XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING
@@ -284,11 +286,18 @@ static void track_button(XrAction action, int button, int *prev)
     *prev = curr;
 }
 
+static int stick_dir(float v, int prev)
+{
+    /* -1, 0, +1 with hysteresis. */
+
+    return (v < -0.6f) ? -1 : (v > 0.6f) ? +1 : (fabsf(v) < 0.4f) ? 0 : prev;
+}
+
 static void track_stick_axis(float v, int neg, int pos, int *prev)
 {
-    /* -1, 0, +1 with hysteresis, reported as D-pad presses. */
+    /* Reported as D-pad presses. */
 
-    int curr = (v < -0.6f) ? -1 : (v > 0.6f) ? +1 : (fabsf(v) < 0.4f) ? 0 : *prev;
+    int curr = stick_dir(v, *prev);
 
     if (curr != *prev)
     {
@@ -347,6 +356,37 @@ static void step_input(void)
         track_stick_axis(-stick.currentState.y,
                          config_get_d(CONFIG_JOYSTICK_DPAD_U),
                          config_get_d(CONFIG_JOYSTICK_DPAD_D), &y_prev);
+    }
+
+    /* Off-hand stick: push up or down to raise or lower the board 25 cm. */
+
+    if (floored)
+    {
+        static int by_prev;
+
+        XrActionStateGetInfo info = { XR_TYPE_ACTION_STATE_GET_INFO };
+        XrActionStateVector2f stick = { XR_TYPE_ACTION_STATE_VECTOR2F };
+        char value[PROP_VALUE_MAX];
+        int by;
+
+        info.action = board_action;
+        xrGetActionStateVector2f(session, &info, &stick);
+
+        /* Testing without controllers: `adb shell setprop debug.neverball.board "x y"`. */
+
+        if (__system_property_get("debug.neverball.board", value) > 0)
+            sscanf(value, "%f %f", &stick.currentState.x, &stick.currentState.y);
+
+        by = stick_dir(stick.currentState.y, by_prev);
+
+        if (by && !by_prev)
+        {
+            course_h = SDL_clamp(course_h + 0.25f * by, -3.0f, 1.5f);
+            config_set_d(CONFIG_COURSE_HEIGHT, (int) roundf(course_h * 100.0f));
+            config_save();
+            log_printf("Course height %.2f m\n", course_h);
+        }
+        by_prev = by;
     }
 
     /* Hand tilt: hold the controller like a tray. */

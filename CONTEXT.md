@@ -26,7 +26,7 @@ The real-world size of the ball, which fixes the size of everything else: a golf
 _Avoid_: zoom, scale factor
 
 **Course height**:
-The height of the course's ground above the real floor, set by the player so seated and standing play both work.
+The height of the course's ground relative to the real floor, set by the player: above it for seated play, below it to look down on the course from higher up.
 _Avoid_: floor offset, seated mode
 
 **Chase view**:
