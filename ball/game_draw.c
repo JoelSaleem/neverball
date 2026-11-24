@@ -484,11 +484,6 @@ void game_draw(struct game_draw *gd, int pose, float t)
         struct s_rend rend;
         float F[16];
 
-        /* Blink-follow shows nothing while the player is moved. */
-
-        if (gd->blink_t > 0.0f)
-            return;
-
         gd->draw.shadow_ui = 0;
 
         game_shadow_conf(pose, 1);

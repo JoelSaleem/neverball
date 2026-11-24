@@ -34,7 +34,7 @@ The flat-screen camera that follows the ball, which this port replaces.
 _Avoid_: HMD mode, VR mode
 
 **Blink-follow**:
-A brief fade that puts the player beside the ball: in **Neverball** when it rolls too far away, in **Neverputt** when it stops.
+A brief fade that puts the player beside the ball in **Neverputt** when it stops.
 _Avoid_: teleport, snap, follow cam
 
 ### Hands and interface
@@ -103,10 +103,8 @@ _Avoid_: flick, gesture
 - **Strength** is the **Putter** head's speed at contact, up to a cap; **Aim** is its direction of travel
 - **Hand tilt** drives **Tilt**; **Neverball** has no **Strength**
 - In **Life-size** **Neverball**, **Tilt** visibly rotates the level while the player stays upright
-- **Blink-follow** is the only way the game moves the player, in both games
+- **Blink-follow** is the only way the game moves the player; in **Neverball** the player stands still for the whole level
 - Each **Neverputt** player has their own **Course height** and **Play hand**, applied at their **Hand-off**
-- During a **Blink-follow** the ball and the level clock are frozen, so the player never loses a ball or time while blind
-- In **Neverball**, **Blink-follow** keeps the player near the ball, so **Tilt** pivots at the ball and the player at once
 
 ## Example dialogue
 

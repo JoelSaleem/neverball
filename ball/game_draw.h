@@ -30,7 +30,6 @@ struct game_draw
 
     float stand[3];                     /* Life-size player position         */
     int   stand_e;                      /* Player position set flag          */
-    float blink_t;                      /* Blink-follow time remaining       */
 };
 
 /* Life-size world scale in metres per unit: the ball is a bowling ball. */

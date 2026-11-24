@@ -19,7 +19,7 @@ void  game_client_free_objects(void);
 void  game_client_load_objects(void);
 void  game_client_sync(fs_file);
 void  game_client_draw(int, float);
-int   game_client_blink(float);
+void  game_client_stand(void);
 void  game_client_blend(float);
 
 int   curr_clock(void);
