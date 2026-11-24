@@ -221,14 +221,15 @@ static void game_draw_jumps(struct s_rend *rend,
 static void game_draw_tilt(const struct game_draw *gd, int d)
 {
     const struct game_tilt *tilt = &gd->tilt;
-    const float *ball_p = gd->vary.uv[0].p;
 
-    /* Rotate the environment about the position of the ball. */
+    /* Rotate the environment about the Life-size player, or the ball. */
 
-    glTranslatef(+ball_p[0], +ball_p[1] * d, +ball_p[2]);
+    const float *p = gd->stand_e ? gd->stand : gd->vary.uv[0].p;
+
+    glTranslatef(+p[0], +p[1] * d, +p[2]);
     glRotatef(-tilt->rz * d, tilt->z[0], tilt->z[1], tilt->z[2]);
     glRotatef(-tilt->rx * d, tilt->x[0], tilt->x[1], tilt->x[2]);
-    glTranslatef(-ball_p[0], -ball_p[1] * d, -ball_p[2]);
+    glTranslatef(-p[0], -p[1] * d, -p[2]);
 }
 
 static void game_refl_all(struct s_rend *rend, const struct game_draw *gd)

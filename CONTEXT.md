@@ -102,7 +102,7 @@ _Avoid_: flick, gesture
 - A **Stroke** has exactly one **Aim** and one **Strength**
 - **Strength** is the **Putter** head's speed at contact, up to a cap; **Aim** is its direction of travel
 - **Hand tilt** drives **Tilt**; **Neverball** has no **Strength**
-- In **Life-size** **Neverball**, **Tilt** visibly rotates the level while the player stays upright
+- In **Life-size** **Neverball**, **Tilt** visibly rotates the level about the player, who stays upright on a floor that does not move under them
 - **Blink-follow** is the only way the game moves the player; in **Neverball** the player stands still for the whole level
 - Each **Neverputt** player has their own **Course height** and **Play hand**, applied at their **Hand-off**
 
